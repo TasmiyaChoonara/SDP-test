@@ -686,7 +686,7 @@ function renderMergeModal(forceTarget) {
     .map((a) => {
       const merged = a.mergedInto ? `<span class="muted">→ ${esc(a.mergedInto.split(' <')[0])}</span>` : '<span class="muted">—</span>';
       const un = a.mergedInto ? `<button class="btn small ghost" data-unmerge="${esc(a.key)}">Unmerge</button>` : '';
-      return `<tr data-key="${esc(a.key)}"><td>${esc(a.name)}</td><td class="muted">${esc(a.email)}</td><td class="num">${fmt(a.commits)}</td><td>${merged}</td><td>${un}</td></tr>`;
+      return `<tr data-key="${esc(a.key)}"><td class="mw-name" title="${esc(a.name)}">${esc(a.name)}</td><td class="muted mw-email" title="${esc(a.email)}">${esc(a.email)}</td><td class="num">${fmt(a.commits)}</td><td>${merged}</td><td>${un}</td></tr>`;
     })
     .join('');
 }
@@ -700,6 +700,8 @@ function flashMergeRow(key) {
   const row = Array.from($('mergeTable').querySelectorAll('tbody tr')).find((r) => r.dataset.key === key);
   if (!row) return;
   row.scrollIntoView({ block: 'center' });
+  const wrap = row.closest('.table-wrap');
+  if (wrap && wrap.scrollWidth > wrap.clientWidth + 4) wrap.scrollLeft = wrap.scrollWidth;
   row.classList.add('row-flash');
   setTimeout(() => row.classList.remove('row-flash'), 3000);
 }

@@ -260,7 +260,7 @@ td.growth-neg { color: var(--red); }
   border-radius: 14px;
   box-shadow: var(--shadow);
 }
-.modal.wide { width: 760px; }
+.modal.wide { width: 880px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
 .modal-head h3 { margin: 0; font-size: 15px; }
 .modal-body { padding: 16px 18px; overflow: auto; }
@@ -307,6 +307,9 @@ td.growth-neg { color: var(--red); }
 .merge-controls select { flex: 1 1 0; min-width: 0; }
 tr.row-flash td { background: rgba(79, 140, 255, 0.18); transition: background 0.3s; }
 .btn[data-unmerge] { color: var(--accent); }
+#mergeTable .mw-name { max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+#mergeTable .mw-email { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+#mergeTable td:last-child { width: 1%; white-space: nowrap; }
 
 /* ---------- toasts / empty states ---------- */
 
