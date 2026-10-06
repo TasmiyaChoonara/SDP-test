@@ -371,7 +371,9 @@ function computeMetrics(ds, opts) {
   const authors = [];
   for (let ai = 0; ai < nAuthors; ai++) {
     const aChurn = aAdded[ai] + aRemoved[ai];
-    if (commitsByAuthor[ai] === 0 && aChurn === 0) continue;
+    // Only authors with real line changes on this object get a row (a pure
+    // rename contributes nothing, so it does not create an author entry).
+    if (aChurn === 0) continue;
     const a = ds.authors[ai];
     authors.push({
       key: a.key,

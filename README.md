@@ -110,7 +110,7 @@ server/store.js      repository ingestion (zip / clone / local), status
                      tracking, LRU dataset cache
 server/index.js      Express API + static UI
 public/              dashboard (vanilla JS + Chart.js)
-test/                fixture generator + 90-assertion metric test suite
+test/                fixture generators + 111-assertion metric test suite
 ```
 
 One git pass per repository keeps ingestion fast (cJSON: 955 commits in ~2 s,
@@ -147,10 +147,21 @@ git-ignored.
 npm test
 ```
 
-This builds a controlled fixture repository (`test/make-fixture.sh`) and verifies
-**90 hand-computed assertions**: mailmap auto-merging, binary exclusion, pure
-renames, deletions, directory roll-ups, `H_t` / `H_{i,j}` / manual commit sets,
-author churn/ownership, manual author merging, search and series.
+This builds two controlled fixture repositories (`test/make-fixture.sh` plus
+an inline 3-level nested-directory fixture) and verifies
+**111 hand-computed assertions**: mailmap auto-merging, binary exclusion, pure
+renames, deletions, directory roll-ups (including nested dirs), `H_t` /
+`H_{i,j}` / manual commit sets, author churn/ownership, manual author
+merging, search and series.
+
+The metric engine was additionally cross-validated against reference metric
+dumps of three real repositories (cJSON, Redis and git.git — 81 884 rows /
+502 278 fields, including per-author rows) that share the same HEAD as the
+analysed repos: every row matches. The comparison harness is included:
+
+```bash
+node test/compare-reference.js <repoId> <reference.csv>
+```
 
 ---
 

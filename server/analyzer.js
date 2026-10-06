@@ -101,18 +101,37 @@ function unquotePath(p) {
 }
 
 /**
- * Given a numstat path field, return the path on the NEW side.
- * Handles rename notation:
- *   "old => new"          -> new
- *   "dir/{old => new}.js" -> dir/new.js
+ * Parse a numstat path field. Returns null for a plain path, or
+ * { oldPath, newPath } when git rendered a rename.
+ *
+ * git's rename display (pprint_rename in diff.c) factors out a common prefix
+ * that ends with '/' and a common suffix that starts with '/'. A side that is
+ * empty is written as nothing, which collapses the slash at the junction:
+ *   "old => new"            -> old -> new
+ *   "dir/{old => new}.js"   -> dir/old.js -> dir/new.js
+ *   "perl/{Git => }/x.pm"   -> perl/Git/x.pm -> perl/x.pm
  */
-function newPathAfterRename(raw) {
+function parseRenamePath(raw) {
   const p = unquotePath(raw);
-  const brace = p.match(/^(.*)\{(.*) => (.*)\}(.*)$/);
-  if (brace) return brace[1] + brace[3] + brace[4];
+  const braceStart = p.indexOf('{');
+  if (braceStart !== -1) {
+    const braceEnd = p.lastIndexOf('}');
+    const inner = braceEnd > braceStart ? p.slice(braceStart + 1, braceEnd) : '';
+    const sep = inner.indexOf(' => ');
+    if (sep !== -1) {
+      const pfx = p.slice(0, braceStart);
+      const sfx = p.slice(braceEnd + 1);
+      const join = (mid) => {
+        if (mid) return pfx + mid + sfx;
+        if (pfx.endsWith('/') && sfx.startsWith('/')) return pfx + sfx.slice(1);
+        return pfx + sfx;
+      };
+      return { oldPath: join(inner.slice(0, sep)), newPath: join(inner.slice(sep + 4)) };
+    }
+  }
   const idx = p.indexOf(' => ');
-  if (idx !== -1) return p.slice(idx + 4);
-  return p;
+  if (idx !== -1) return { oldPath: p.slice(0, idx), newPath: p.slice(idx + 4) };
+  return null;
 }
 
 function fileIdFor(ds, path) {
@@ -178,7 +197,14 @@ function finalizeDataset(ds) {
     ancs.push(0); // root is always an ancestor
     ds.ancestors[fid] = ancs;
   }
-  for (let d = 1; d < ds.dirs.length; d++) {
+  // Directories were discovered walking each file's ancestors from the
+  // immediate parent upwards, so a child dir can have a lower id than its
+  // parent. Depth must be computed parent-first, which a path-length sort
+  // guarantees (a parent path is always a strict prefix of its children).
+  const order = [];
+  for (let d = 1; d < ds.dirs.length; d++) order.push(d);
+  order.sort((a, b) => ds.dirs[a].length - ds.dirs[b].length);
+  for (const d of order) {
     const p = ds.dirs[d];
     const idx = p.lastIndexOf('/');
     ds.dirParent[d] = idx < 0 ? 0 : ds.dirIndex.get(p.slice(0, idx));
@@ -263,8 +289,12 @@ function buildDataset(gitDir, hooks = {}) {
       const added = parseInt(aRaw, 10);
       const removed = parseInt(dRaw, 10);
       if (Number.isNaN(added) || Number.isNaN(removed)) return;
-      const path = newPathAfterRename(pathRaw);
+      const ren = parseRenamePath(pathRaw);
+      const path = ren ? ren.newPath : unquotePath(pathRaw);
       if (!path) return;
+      // The old side of a rename still becomes a known path (with no changes
+      // of its own) so that it appears in listings, as in the reference tool.
+      if (ren && ren.oldPath && ren.oldPath !== path) fileIdFor(ds, ren.oldPath);
       const fid = fileIdFor(ds, path);
       ds.changes.c.push(cur);
       ds.changes.f.push(fid);

@@ -40,6 +40,30 @@ function ts(iso) {
   return Date.parse(iso) / 1000;
 }
 
+/**
+ * Second fixture with directories nested three levels deep. The main fixture
+ * only has 1-level dirs, which cannot catch depth/ancestor regressions (a
+ * child dir discovered before its parent used to get the wrong depth, making
+ * every roll-up metric come out as zero).
+ */
+function makeNestedFixture(dir) {
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(path.join(dir, 'deep', 'nested', 'dir'), { recursive: true });
+  const git = (args) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
+  git(['init', '-q', '-b', 'main', '.']);
+  git(['config', 'user.name', 'Nested']);
+  git(['config', 'user.email', 'nested@example.com']);
+  git(['config', 'commit.gpgsign', 'false']);
+  const file = path.join(dir, 'deep', 'nested', 'dir', 'file.txt');
+  fs.writeFileSync(file, 'one\ntwo\nthree\n');
+  git(['add', '-A']);
+  git(['commit', '-q', '-m', 'N1: create deep file']);
+  fs.writeFileSync(file, 'one\nTWO\nthree\nfour\n');
+  git(['add', '-A']);
+  git(['commit', '-q', '-m', 'N2: edit deep file']);
+  return path.join(dir, '.git');
+}
+
 async function main() {
   console.log('Creating fixture repository…');
   execFileSync('bash', [path.join(__dirname, 'make-fixture.sh'), FIXTURE], { stdio: 'pipe' });
@@ -215,6 +239,43 @@ async function main() {
   const seriesDel = rootAll.series.reduce((s, p) => s + p[3], 0);
   eq('series total added', seriesAdd, 10);
   eq('series total removed', seriesDel, 3);
+
+  console.log('\n[nested directories (3 levels) - regression]');
+  const nestedGit = makeNestedFixture(path.join(__dirname, 'fixtures', 'nested'));
+  const nds = await analyzer.buildDataset(nestedGit);
+  const nCan = metrics.resolveAuthorMerges(nds, {});
+  const nAll = metrics.selectCommits(nds, {});
+  const dirId = (p) => nds.dirs.indexOf(p);
+  eq('dir "deep" resolved', dirId('deep') > 0, true);
+  eq('dir "deep/nested" resolved', dirId('deep/nested') > 0, true);
+  eq('dir "deep/nested/dir" resolved', dirId('deep/nested/dir') > 0, true);
+  eq('depth of "deep"', nds.dirDepth[dirId('deep')], 1);
+  eq('depth of "deep/nested"', nds.dirDepth[dirId('deep/nested')], 2);
+  eq('depth of "deep/nested/dir"', nds.dirDepth[dirId('deep/nested/dir')], 3);
+  eq('parent of "deep/nested/dir"', nds.dirParent[dirId('deep/nested/dir')], dirId('deep/nested'));
+
+  // N1: +3 -0, N2: +2 -1 -> added 5, removed 1, churn 6, both commits modify.
+  const nDeepDir = metrics.computeMetrics(nds, { sel: nAll.sel, n: nAll.n, obj: metrics.resolveObject(nds, 'dir', 'deep/nested/dir'), canArr: nCan });
+  eq('deep/nested/dir added', nDeepDir.added, 5);
+  eq('deep/nested/dir removed', nDeepDir.removed, 1);
+  eq('deep/nested/dir growth', nDeepDir.growth, 4);
+  eq('deep/nested/dir churn', nDeepDir.churn, 6);
+  eq('deep/nested/dir modifications', nDeepDir.modifications, 2);
+  eq('deep/nested/dir frequency', nDeepDir.frequency, 1);
+  eq('deep/nested/dir churn rate', nDeepDir.churnRate, 3);
+
+  const nMid = metrics.computeMetrics(nds, { sel: nAll.sel, n: nAll.n, obj: metrics.resolveObject(nds, 'dir', 'deep/nested'), canArr: nCan });
+  eq('deep/nested roll-up churn', nMid.churn, 6);
+  eq('deep/nested roll-up modifications', nMid.modifications, 2);
+
+  const nTop = metrics.computeMetrics(nds, { sel: nAll.sel, n: nAll.n, obj: metrics.resolveObject(nds, 'dir', 'deep'), canArr: nCan });
+  eq('deep roll-up churn', nTop.churn, 6);
+
+  const nRoot = metrics.computeMetrics(nds, { sel: nAll.sel, n: nAll.n, obj: metrics.resolveObject(nds, 'repo', ''), canArr: nCan, withChildren: true });
+  eq('nested root churn', nRoot.churn, 6);
+  eq('nested root children = top-level dir only', nRoot.children.length, 1);
+  eq('nested root child is "deep"', nRoot.children[0].kind + ' ' + nRoot.children[0].path, 'dir deep');
+  eq('nested root child churn', nRoot.children[0].churn, 6);
 
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) {
