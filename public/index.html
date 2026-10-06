@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAT — Repo Analysis Tool</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">RAT</span>
+      <span class="sub">Repo Analysis Tool</span>
+    </div>
+    <div class="repo-controls">
+      <select id="repoSelect" title="Select repository"></select>
+      <span id="repoStatus" class="status-pill hidden"></span>
+      <button id="btnAddRepo" class="btn primary">+ Add repository</button>
+      <button id="btnReanalyze" class="btn ghost icon" title="Re-analyze this repository">⟳</button>
+      <button id="btnDeleteRepo" class="btn danger ghost icon" title="Remove this repository from RAT">🗑</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-head">
+        <span>Objects</span>
+      </div>
+      <div class="search-wrap">
+        <input id="objSearch" placeholder="Search files / directories…" autocomplete="off" />
+        <div id="searchResults" class="search-results hidden"></div>
+      </div>
+      <div id="tree" class="tree"></div>
+    </aside>
+
+    <main id="main">
+      <section class="filters card" id="filterBar">
+        <div class="filter-group">
+          <label for="authorSelect">Author</label>
+          <select id="authorSelect"></select>
+          <button id="btnMergeAuthors" class="btn small" title="Manually merge authors">Merge…</button>
+        </div>
+        <div class="filter-group">
+          <label>Commits</label>
+          <div class="seg" id="commitMode">
+            <button data-mode="all" class="seg-btn active">All</button>
+            <button data-mode="range" class="seg-btn">Range</button>
+            <button data-mode="manual" class="seg-btn">Pick…</button>
+          </div>
+        </div>
+        <div id="rangeControls" class="filter-group hidden">
+          <label>From (incl.)</label>
+          <input type="datetime-local" id="fromInput" />
+          <label>To (excl.)</label>
+          <input type="datetime-local" id="toInput" />
+          <button id="btnApplyRange" class="btn small primary">Apply</button>
+          <button class="btn small ghost" data-last="7">7d</button>
+          <button class="btn small ghost" data-last="30">30d</button>
+          <button class="btn small ghost" data-last="90">90d</button>
+        </div>
+        <div id="manualControls" class="filter-group hidden">
+          <span id="manualInfo" class="muted"></span>
+          <button id="btnEditManual" class="btn small">Edit selection…</button>
+          <button id="btnClearManual" class="btn small ghost">Clear</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="filter-group commitset-info">
+          <label>Commit set</label>
+          <span id="commitSetInfo" class="muted">—</span>
+        </div>
+      </section>
+
+      <div id="emptyState" class="empty-state hidden">
+        <h2>Welcome to RAT</h2>
+        <p>Analyze git repositories — file, directory, repository, commit-set and author metrics.</p>
+        <p>Get started by adding a repository:</p>
+        <ul>
+          <li><strong>Clone URL</strong> — a public remote repository (deep clone)</li>
+          <li><strong>Zip upload</strong> — an archive of the repo containing its <code>.git</code> directory</li>
+          <li><strong>Local path</strong> — a repository already on this machine</li>
+        </ul>
+        <button class="btn primary large" onclick="document.getElementById('btnAddRepo').click()">+ Add your first repository</button>
+      </div>
+
+      <div id="repoView" class="hidden">
+        <nav class="crumbs" id="crumbs"></nav>
+
+        <section class="cards" id="metricCards"></section>
+
+        <section class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h3>Metric history</h3>
+              <span class="muted">per commit in the commit set</span>
+            </div>
+            <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
+            <div id="timelineEmpty" class="chart-empty hidden">No changes for this object in the selected commit set.</div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Ownership</h3>
+              <span class="muted">share of churn per author</span>
+            </div>
+            <div class="chart-wrap"><canvas id="chartOwners"></canvas></div>
+            <div id="ownersEmpty" class="chart-empty hidden">No authors for this selection.</div>
+          </div>
+        </section>
+
+        <section class="card" id="childrenCard">
+          <div class="card-head">
+            <h3 id="childrenTitle">Contents</h3>
+            <span class="muted">click a row to drill down</span>
+          </div>
+          <div class="table-wrap">
+            <table id="childrenTable">
+              <thead>
+                <tr>
+                  <th data-key="name">Name</th>
+                  <th data-key="added" class="num">Added</th>
+                  <th data-key="removed" class="num">Removed</th>
+                  <th data-key="growth" class="num">Growth</th>
+                  <th data-key="churn" class="num">Churn</th>
+                  <th data-key="modifications" class="num" title="Number of commits in H modifying this object">Mods</th>
+                  <th data-key="frequency" class="num" title="Modification frequency = n_H,o / |H|">Freq</th>
+                  <th data-key="churnRate" class="num" title="Churn rate = λ_H,o / |H|">Churn rate</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h3>Authors</h3>
+            <span class="muted" id="authorsCaption"></span>
+          </div>
+          <div class="table-wrap">
+            <table id="authorsTable">
+              <thead>
+                <tr>
+                  <th>Author</th>
+                  <th class="num">Commits in H</th>
+                  <th class="num">Added</th>
+                  <th class="num">Removed</th>
+                  <th class="num">Churn</th>
+                  <th class="num" title="Author modifications n_H,o,a">Mods</th>
+                  <th>Ownership ω</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add repository modal -->
+  <div id="modalAddRepo" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Add repository</h3>
+        <button class="btn ghost icon" data-close="modalAddRepo">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="tabs" id="addRepoTabs">
+          <button data-tab="url" class="tab-btn active">Clone URL</button>
+          <button data-tab="zip" class="tab-btn">Zip upload</button>
+          <button data-tab="local" class="tab-btn">Local path</button>
+        </div>
+
+        <div class="tab-panel" data-panel="url">
+          <p class="muted">Deep clones a public repository (https://, git:// or git@host:path).</p>
+          <input id="cloneUrl" placeholder="https://github.com/DaveGamble/cJSON.git" />
+          <input id="cloneName" placeholder="Display name (optional)" />
+          <button id="btnClone" class="btn primary">Clone &amp; analyze</button>
+        </div>
+
+        <div class="tab-panel hidden" data-panel="zip">
+          <p class="muted">Upload a zip of a repository that includes its <code>.git</code> directory.</p>
+          <div id="dropZone" class="drop-zone">
+            <input type="file" id="zipFile" accept=".zip" hidden />
+            <p>Drag &amp; drop a <strong>.zip</strong> here or <button class="btn small" id="btnPickZip">browse</button></p>
+            <p id="zipChosen" class="muted"></p>
+          </div>
+          <input id="zipName" placeholder="Display name (optional)" />
+          <button id="btnUploadZip" class="btn primary">Upload &amp; analyze</button>
+        </div>
+
+        <div class="tab-panel hidden" data-panel="local">
+          <p class="muted">Analyze a repository that already exists on this machine (path to the working tree).</p>
+          <input id="localPath" placeholder="/path/to/repository" />
+          <button id="btnLocal" class="btn primary">Analyze</button>
+        </div>
+
+        <div id="addRepoProgress" class="add-progress hidden">
+          <div class="progress"><div class="progress-bar" id="addProgressBar"></div></div>
+          <span id="addProgressText" class="muted"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commit picker modal -->
+  <div id="modalCommits" class="modal-backdrop hidden">
+    <div class="modal wide">
+      <div class="modal-head">
+        <h3>Select commits</h3>
+        <button class="btn ghost icon" data-close="modalCommits">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="picker-bar">
+          <input id="pickSearch" placeholder="Search hash / message / author…" />
+          <button id="btnPickAll" class="btn small">Select all matching</button>
+          <button id="btnPickNone" class="btn small ghost">Clear</button>
+          <span id="pickCount" class="muted"></span>
+        </div>
+        <div id="pickList" class="pick-list"></div>
+        <div class="picker-foot">
+          <button id="btnPickMore" class="btn small ghost">Load more…</button>
+          <button id="btnPickApply" class="btn primary">Apply selection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Author merge modal -->
+  <div id="modalMerge" class="modal-backdrop hidden">
+    <div class="modal wide">
+      <div class="modal-head">
+        <h3>Merge authors</h3>
+        <button class="btn ghost icon" data-close="modalMerge">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted">Authors detected from git history (email rewriting via <code>.mailmap</code> is applied automatically). Select two authors to merge them manually.</p>
+        <div class="merge-controls">
+          <select id="mergeSource"></select>
+          <span>→</span>
+          <select id="mergeTarget"></select>
+          <button id="btnDoMerge" class="btn primary">Merge</button>
+        </div>
+        <div class="table-wrap max-h">
+          <table id="mergeTable">
+            <thead>
+              <tr><th>Author</th><th>Email</th><th class="num">Commits</th><th>Merged into</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <script src="/vendor/chart.js"></script>
+  <script src="/app.js?v=3"></script>
+</body>
+</html>
