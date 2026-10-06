@@ -661,20 +661,47 @@ async function selectAllMatching() {
 
 /* ------------------------- author merge modal ----------------------------- */
 
-function renderMergeModal() {
+function renderMergeModal(forceTarget) {
   const opts = state.authors
-    .map((a) => `<option value="${esc(a.key)}">${esc(a.name)} &lt;${esc(a.email)}&gt; (${fmt(a.commits)})</option>`)
+    .map((a) => `<option value="${esc(a.key)}">${esc(a.name)} &lt;${esc(a.email)}&gt; (${fmt(a.commits)})${a.mergedInto ? ' · merged' : ''}</option>`)
     .join('');
-  $('mergeSource').innerHTML = opts;
-  $('mergeTarget').innerHTML = opts;
+  const srcSel = $('mergeSource');
+  const tgtSel = $('mergeTarget');
+  const keepSrc = srcSel.value;
+  const keepTgt = tgtSel.value;
+  srcSel.innerHTML = opts;
+  tgtSel.innerHTML = opts;
+  const hasOpt = (sel, v) => Array.from(sel.options).some((o) => o.value === v);
+  // Keep the user's choices across re-renders; otherwise default to TWO DIFFERENT authors.
+  if (forceTarget && hasOpt(tgtSel, forceTarget)) tgtSel.value = forceTarget;
+  else if (hasOpt(tgtSel, keepTgt)) tgtSel.value = keepTgt;
+  else if (tgtSel.options.length > 1) tgtSel.selectedIndex = 1;
+  if (!forceTarget && hasOpt(srcSel, keepSrc) && keepSrc !== tgtSel.value) srcSel.value = keepSrc;
+  else {
+    const i = Array.from(srcSel.options).findIndex((o) => o.value !== tgtSel.value);
+    srcSel.selectedIndex = i < 0 ? 0 : i;
+  }
   const tbody = $('mergeTable').querySelector('tbody');
   tbody.innerHTML = state.authors
     .map((a) => {
       const merged = a.mergedInto ? `<span class="muted">→ ${esc(a.mergedInto.split(' <')[0])}</span>` : '<span class="muted">—</span>';
-      const un = a.mergedInto ? `<button class="btn small ghost" data-unmerge="${esc(a.key)}">unmerge</button>` : '';
-      return `<tr><td>${esc(a.name)}</td><td class="muted">${esc(a.email)}</td><td class="num">${fmt(a.commits)}</td><td>${merged}</td><td>${un}</td></tr>`;
+      const un = a.mergedInto ? `<button class="btn small ghost" data-unmerge="${esc(a.key)}">Unmerge</button>` : '';
+      return `<tr data-key="${esc(a.key)}"><td>${esc(a.name)}</td><td class="muted">${esc(a.email)}</td><td class="num">${fmt(a.commits)}</td><td>${merged}</td><td>${un}</td></tr>`;
     })
     .join('');
+}
+
+function authorLabel(key) {
+  const a = state.authors.find((x) => x.key === key);
+  return a ? a.name : key.split(' <')[0];
+}
+
+function flashMergeRow(key) {
+  const row = Array.from($('mergeTable').querySelectorAll('tbody tr')).find((r) => r.dataset.key === key);
+  if (!row) return;
+  row.scrollIntoView({ block: 'center' });
+  row.classList.add('row-flash');
+  setTimeout(() => row.classList.remove('row-flash'), 3000);
 }
 
 async function doMerge() {
@@ -689,7 +716,9 @@ async function doMerge() {
     });
     if (state.filter.author === source) state.filter.author = target;
     await loadAuthors();
-    renderMergeModal();
+    renderMergeModal(target);
+    flashMergeRow(source);
+    toast(`Merged "${authorLabel(source)}" into "${authorLabel(target)}". Use Unmerge on the highlighted row to undo.`, 'success');
     await bumpFilter();
   } catch (err) {
     toast(err.message);
@@ -705,6 +734,8 @@ async function doUnmerge(source) {
     });
     await loadAuthors();
     renderMergeModal();
+    flashMergeRow(source);
+    toast(`Unmerged "${authorLabel(source)}".`, 'success');
     await bumpFilter();
   } catch (err) {
     toast(err.message);

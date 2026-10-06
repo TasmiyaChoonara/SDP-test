@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAT — Repo Analysis Tool</title>
-  <link rel="stylesheet" href="/style.css?v=4" />
+  <link rel="stylesheet" href="/style.css?v=5" />
 </head>
 <body>
   <header class="topbar">
@@ -237,7 +237,7 @@
         <button class="btn ghost icon" data-close="modalMerge">✕</button>
       </div>
       <div class="modal-body">
-        <p class="muted">Authors detected from git history (email rewriting via <code>.mailmap</code> is applied automatically). Select two authors to merge them manually.</p>
+        <p class="muted">Authors detected from git history (email rewriting via <code>.mailmap</code> is applied automatically). Select two authors to merge them manually (different by default); merged authors show their target in the table and can be un-merged from their row.</p>
         <div class="merge-controls">
           <select id="mergeSource"></select>
           <span>→</span>
@@ -259,6 +259,6 @@
   <div id="toasts"></div>
 
   <script src="/vendor/chart.js"></script>
-  <script src="/app.js?v=4"></script>
+  <script src="/app.js?v=5"></script>
 </body>
 </html>
