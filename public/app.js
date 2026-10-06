@@ -728,7 +728,7 @@ function renderTimeline(series) {
   }
   if (!series.length) {
     empty.classList.remove('hidden');
-    canvas.style.opacity = 0.12;
+    canvas.style.opacity = 0;
     return;
   }
   empty.classList.add('hidden');
@@ -775,7 +775,7 @@ function renderOwners(authors) {
   const rows = authors.filter((a) => a.ownership > 0).slice(0, 12);
   if (!rows.length) {
     empty.classList.remove('hidden');
-    canvas.style.opacity = 0.12;
+    canvas.style.opacity = 0;
     return;
   }
   empty.classList.add('hidden');

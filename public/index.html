@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAT — Repo Analysis Tool</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=4" />
 </head>
 <body>
   <header class="topbar">
@@ -93,16 +93,20 @@
               <h3>Metric history</h3>
               <span class="muted">per commit in the commit set</span>
             </div>
-            <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
-            <div id="timelineEmpty" class="chart-empty hidden">No changes for this object in the selected commit set.</div>
+            <div class="chart-wrap">
+              <canvas id="chartTimeline"></canvas>
+              <div id="timelineEmpty" class="chart-empty hidden">No changes for this object in the selected commit set.</div>
+            </div>
           </div>
           <div class="card">
             <div class="card-head">
               <h3>Ownership</h3>
               <span class="muted">share of churn per author</span>
             </div>
-            <div class="chart-wrap"><canvas id="chartOwners"></canvas></div>
-            <div id="ownersEmpty" class="chart-empty hidden">No authors for this selection.</div>
+            <div class="chart-wrap">
+              <canvas id="chartOwners"></canvas>
+              <div id="ownersEmpty" class="chart-empty hidden">No authors for this selection.</div>
+            </div>
           </div>
         </section>
 
@@ -255,6 +259,6 @@
   <div id="toasts"></div>
 
   <script src="/vendor/chart.js"></script>
-  <script src="/app.js?v=3"></script>
+  <script src="/app.js?v=4"></script>
 </body>
 </html>

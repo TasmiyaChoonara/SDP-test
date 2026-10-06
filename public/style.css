@@ -204,7 +204,8 @@ main { flex: 1; overflow: auto; padding: 16px 20px 60px; }
 
 .chart-wrap { position: relative; height: 280px; }
 .chart-empty {
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,8 +303,8 @@ td.growth-neg { color: var(--red); }
 .pick-item .s { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-foot { display: flex; justify-content: space-between; margin-top: 10px; }
 
-.merge-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.merge-controls select { flex: 1; }
+.merge-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.merge-controls select { flex: 1 1 0; min-width: 0; }
 
 /* ---------- toasts / empty states ---------- */
 
